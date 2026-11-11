@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  RESIDENCIAL VALE VERDE — página cinematográfica 2.5D (teste da skill epic-design)
+  ============================================================================
+  Técnicas do catálogo aplicadas:
+   • 6-layer parallax (depth 0–5) em todas as cenas            🟢
+   • Pinned sticky + scrub timeline (hero, manifesto, terreno, implantação, equipe) 🟢
+   • Split converge + diverge no título (Vale ← → Verde)        🟢
+   • Masked line curtain reveal ("Residencial", títulos)        🟢
+   • Word-by-word scroll lighting (manifesto)                   🟢
+   • Scramble text (dados de zoneamento)                        🟢
+   • Multi-directional stagger grid (cards de números)          🟢
+   • Circle iris expand (foto do terreno)                       🟢
+   • Perspective zoom / flatten (implantação)                   🟢
+   • Clip-path wipe reveal (planta)                             🟢
+   • Horizontal scroll conversion (equipe)                      🟢
+   • Ghost outlined background text + bleed typography          🟢
+   • Floating loops 6–14s nos elementos-herói                   🟢
+   • Simulação 4D/BIM em Three.js (build3d.js) — exceção pedida ao  🟡
+     "sem WebGL" da skill, para maquete com luz, sombra e materiais
+  Acessibilidade: prefers-reduced-motion, pointer:coarse com efeitos reduzidos,
+  skip link, aria-hidden em decoração, alt em todas as imagens.
+  Motor: GSAP 3.12.5 + ScrollTrigger via jsDelivr. Sem WebGL.
+  ============================================================================
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Residencial Vale Verde — MCMV Faixa 1 · Niterói</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ---------------------------------------------------------------------------
+   TOKENS — paleta tirada do logo e do deck (verde-floresta + sol laranja)
+--------------------------------------------------------------------------- */
+:root{
+  --forest:#26321F; --forest-2:#2F3D29; --ink:#1B2418;
+  --green-d:#2E5F3C; --green:#4E8A3A; --green-l:#79B043;
+  --sun:#EE8A2E; --sun-d:#E0632A; --sun-l:#F6B565;
+  --paper:#F4F4F1; --paper-2:#E9EBE4; --mute:#6B7465;
+  --radius:18px;
+  --pad: clamp(20px, 5vw, 72px);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:Poppins,system-ui,sans-serif;background:var(--forest);color:var(--paper);overflow-x:hidden;line-height:1.5}
+img{display:block;max-width:100%}
+a{color:inherit}
+.skip-link{position:absolute;left:12px;top:-60px;z-index:999;background:var(--sun);color:var(--ink);padding:10px 16px;border-radius:8px;font-weight:600;text-decoration:none}
+.skip-link:focus{top:12px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------------------------------------------------------------------------
+   DEPTH SYSTEM — 6 níveis (skill: references/depth-system.md)
+--------------------------------------------------------------------------- */
+.scene{position:relative;overflow:hidden;isolation:isolate}
+.layer{position:absolute;inset:0;pointer-events:none}
+.depth-0{z-index:0} .depth-1{z-index:1} .depth-2{z-index:2}
+.depth-3{z-index:3} .depth-4{z-index:4;position:relative;pointer-events:auto} .depth-5{z-index:5}
+.depth-0 .blur-bg{filter:blur(8px);transform:scale(1.08)}
+.depth-1 .soft{filter:blur(4px)}
+
+/* Floating loop — nunca totalmente estático (6–14s) */
+@keyframes floatY{0%,100%{transform:translate3d(0,0,0) rotate(0)}50%{transform:translate3d(0,-14px,0) rotate(.6deg)}}
+@keyframes floatX{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(10px,-8px,0)}}
+@keyframes drift{0%{transform:translate3d(0,0,0);opacity:0}15%{opacity:.9}100%{transform:translate3d(30px,-120px,0);opacity:0}}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.08);opacity:1}}
+.float-loop{animation:floatY 9s ease-in-out infinite}
+.float-slow{animation:floatX 13s ease-in-out infinite}
+
+/* ---------------------------------------------------------------------------
+   NAV + barra de progresso
+--------------------------------------------------------------------------- */
+.nav{position:fixed;inset:0 0 auto 0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:14px var(--pad);
+  background:linear-gradient(to bottom,rgba(27,36,24,.75),rgba(27,36,24,0));pointer-events:none}
+.nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.01em;pointer-events:auto;text-decoration:none}
+.nav .brand svg{width:34px;height:34px}
+.nav .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.8}
+.progress{position:fixed;left:0;top:0;height:3px;width:100%;background:linear-gradient(90deg,var(--green-l),var(--sun));transform-origin:0 50%;transform:scaleX(0);z-index:60}
+
+/* ---------------------------------------------------------------------------
+   TIPOGRAFIA comum
+--------------------------------------------------------------------------- */
+.eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-weight:500;opacity:.85}
+.h2{font-size:clamp(34px,5.6vw,84px);line-height:1.02;margin:.2em 0 .35em;font-weight:200;letter-spacing:-.02em}
+.h2 b{font-weight:700}
+.mask{display:block;overflow:hidden;padding-bottom:.06em}
+.mask > span{display:inline-block}
+.lead{font-size:clamp(16px,1.4vw,20px);font-weight:300;max-width:46ch;opacity:.9}
+.word{display:inline-block}
+
+/* ---------------------------------------------------------------------------
+   CENA 1 — HERO: o logo "explodido" em 2.5D (céu, sol, colinas)
+--------------------------------------------------------------------------- */
+.hero{height:100vh;min-height:620px}
+.hero .sky{position:absolute;inset:0;background:
+  radial-gradient(120% 70% at 50% 92%, #F2A24E 0%, #C9733A 18%, #5B5A35 42%, #2F3D29 66%, #1B2418 100%)}
+.hero .photo{position:absolute;inset:-4%;background:url(assets/terreno-1.jpg) center/cover no-repeat;opacity:.16;mix-blend-mode:luminosity}
+.hero .sun-wrap{position:absolute;left:50%;bottom:20%;width:min(46vw,520px);aspect-ratio:1;translate:-50% 0}
+.hero .sun{width:100%;height:100%;border-radius:50%;
+  background:radial-gradient(circle at 50% 45%, #FFD9A0 0%, var(--sun-l) 30%, var(--sun) 58%, var(--sun-d) 100%);
+  box-shadow:0 0 120px 40px rgba(238,138,46,.45)}
+.hero .halo{position:absolute;inset:-35%;border-radius:50%;background:radial-gradient(circle, rgba(246,181,101,.55), rgba(246,181,101,0) 62%);animation:pulse 8s ease-in-out infinite}
+.hill{position:absolute;left:-6%;width:112%;bottom:0}
+.hill svg{width:100%;height:auto;display:block}
+.hill--back{bottom:14%}
+.hill--mid{bottom:2%}
+.hill--front{bottom:-6%}
+.hero .content{position:relative;z-index:4;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:0 var(--pad);padding-bottom:22vh}
+.hero h1{text-shadow:0 6px 40px rgba(27,36,24,.55);margin:.25em 0 0;font-size:clamp(56px,11vw,170px);line-height:.92;font-weight:700;letter-spacing:-.035em;display:flex;gap:.22em;flex-wrap:wrap;justify-content:center}
+.hero h1 .w{display:inline-block}
+.hero .sub{text-shadow:0 2px 18px rgba(27,36,24,.6);display:block;font-size:clamp(20px,3vw,40px);font-weight:200;letter-spacing:.32em;text-transform:uppercase;margin-top:.5em}
+.hero .meta{position:absolute;left:0;right:0;bottom:26px;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;padding:0 var(--pad);font-size:14px}
+.hero .meta strong{font-size:clamp(28px,3vw,42px);font-weight:700;color:var(--green-l);line-height:1;display:block}
+.scroll-cue{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.85}
+.scroll-cue i{width:1px;height:42px;background:linear-gradient(var(--paper),transparent);animation:floatY 2.4s ease-in-out infinite}
+.pollen{position:absolute;width:6px;height:6px;border-radius:50%;background:#FFE3B3;box-shadow:0 0 10px #FFD08A;animation:drift 10s linear infinite}
+
+/* ---------------------------------------------------------------------------
+   CENA 2 — MANIFESTO (word lighting)
+--------------------------------------------------------------------------- */
+.manifesto{min-height:100vh;display:flex;align-items:center;background:var(--ink)}
+.ghost{position:absolute;left:50%;top:50%;translate:-50% -50%;white-space:nowrap;font-size:clamp(90px,19vw,320px);font-weight:800;letter-spacing:-.04em;
+  color:transparent;-webkit-text-stroke:1px rgba(244,244,241,.09);line-height:1}
+.glow{position:absolute;border-radius:50%;filter:blur(60px)}
+.manifesto .glow{width:50vw;height:50vw;left:-10vw;bottom:-20vw;background:rgba(78,138,58,.35)}
+.manifesto .glow.b{left:auto;right:-12vw;top:-18vw;bottom:auto;width:36vw;height:36vw;background:rgba(238,138,46,.22)}
+.manifesto .inner{padding:18vh var(--pad);max-width:1180px;margin:0 auto}
+.lit{font-size:clamp(26px,3.6vw,54px);line-height:1.22;font-weight:300;letter-spacing:-.01em;margin:0}
+.lit .word{color:rgba(244,244,241,.14);transition:color .25s ease}
+.lit .word.on{color:var(--paper)}
+.lit .word.hl.on{color:var(--sun-l);font-weight:500}
+
+/* ---------------------------------------------------------------------------
+   CENA 3 — NÚMEROS
+--------------------------------------------------------------------------- */
+.numbers{background:var(--paper);color:var(--ink);padding:16vh 0 14vh}
+.numbers .glow{width:46vw;height:46vw;right:-14vw;top:10%;background:rgba(121,176,67,.28)}
+.contours{position:absolute;inset:0;width:100%;height:100%}
+.numbers .inner{padding:0 var(--pad);max-width:1280px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6vh}
+.stat{background:#fff;border-radius:var(--radius);padding:28px 26px 26px;box-shadow:0 24px 60px -30px rgba(38,50,31,.35);border:1px solid rgba(38,50,31,.06);position:relative;overflow:hidden}
+.stat::after{content:"";position:absolute;left:0;top:0;height:4px;width:100%;background:linear-gradient(90deg,var(--green),var(--sun))}
+.stat .big{font-size:clamp(40px,4.6vw,68px);font-weight:700;line-height:1;letter-spacing:-.03em;color:var(--green-d)}
+.stat .big small{font-size:.42em;font-weight:500;letter-spacing:0;margin-left:.12em;color:var(--mute)}
+.stat .lbl{margin-top:10px;font-weight:600}
+.stat .det{margin-top:4px;font-size:14px;color:var(--mute)}
+.stat.accent{background:var(--forest);color:var(--paper)}
+.stat.accent .big{color:var(--sun-l)} .stat.accent .det{color:rgba(244,244,241,.7)}
+.leaf{position:absolute;width:64px;opacity:.9}
+
+/* ---------------------------------------------------------------------------
+   CENA 4 — TERRENO (circle iris)
+--------------------------------------------------------------------------- */
+.terrain{height:100vh;min-height:600px;background:var(--forest)}
+.terrain .iris{position:absolute;inset:0;clip-path:circle(150% at 50% 55%)}
+.terrain .iris img{width:100%;height:100%;object-fit:cover}
+.terrain .shade{position:absolute;inset:0;background:linear-gradient(100deg,rgba(27,36,24,.88) 0%,rgba(27,36,24,.55) 45%,rgba(27,36,24,.05) 75%)}
+.terrain .inner{position:relative;z-index:4;height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 var(--pad);max-width:760px}
+.terrain .companion{position:absolute;right:calc(var(--pad) + 2vw);bottom:12vh;width:min(30vw,380px);border-radius:14px;overflow:hidden;border:6px solid var(--paper);box-shadow:0 40px 80px -20px rgba(0,0,0,.6);rotate:3deg}
+.terrain .companion figcaption{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;background:rgba(27,36,24,.75);font-size:12px}
+.cota{display:flex;gap:28px;margin-top:22px;flex-wrap:wrap}
+.cota div{border-left:2px solid var(--sun);padding-left:12px}
+.cota b{display:block;font-size:28px;font-weight:600;line-height:1.1}
+.cota span{font-size:13px;opacity:.8}
+
+/* ---------------------------------------------------------------------------
+   CENA 5 — LOCALIZAÇÃO E LEGISLAÇÃO
+--------------------------------------------------------------------------- */
+.place{background:var(--forest-2);padding:16vh 0}
+.place .inner{padding:0 var(--pad);max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:6vw;align-items:start}
+.addr{font-size:clamp(20px,2vw,28px);font-weight:300;margin:0 0 22px}
+.addr b{font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 26px;padding:0;list-style:none}
+.chips li{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(244,244,241,.07);border:1px solid rgba(244,244,241,.14);font-size:14px}
+.chips li i{width:9px;height:9px;border-radius:50%;background:var(--green-l);flex:none}
+.chips li.h i{background:#E25A4A} .chips li.c i{background:var(--sun)}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:13px 20px;border-radius:999px;background:var(--sun);color:var(--ink);text-decoration:none;font-weight:600;font-size:15px}
+.btn:hover{background:var(--sun-l)}
+.table{border-top:1px solid rgba(244,244,241,.18);margin:0}
+.row{display:grid;grid-template-columns:1fr 1.1fr;gap:18px;padding:18px 0;border-bottom:1px solid rgba(244,244,241,.18)}
+.row dt{font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;padding-top:4px}
+.row dd{margin:0;font-size:clamp(18px,1.7vw,24px);font-weight:500;font-variant-numeric:tabular-nums}
+.row dd small{display:block;font-size:13px;font-weight:300;opacity:.75}
+.place .ghost{top:auto;bottom:-4vw;translate:-50% 0;-webkit-text-stroke-color:rgba(121,176,67,.13)}
+
+/* ---------------------------------------------------------------------------
+   CENA 6 — IMPLANTAÇÃO (perspective flatten)
+--------------------------------------------------------------------------- */
+.plan{min-height:100vh;background:var(--paper);color:var(--ink);display:flex;align-items:center}
+.plan .inner{position:relative;z-index:4;width:100%;padding:12vh var(--pad);max-width:1320px;margin:0 auto;display:grid;grid-template-columns:.8fr 1.2fr;gap:5vw;align-items:center}
+.stage{perspective:1400px}
+.board{position:relative;border-radius:16px;background:#fff;padding:12px;box-shadow:0 60px 120px -40px rgba(38,50,31,.55);transform-origin:50% 80%}
+.board img{border-radius:8px}
+.pin{position:absolute;display:flex;align-items:center;gap:8px;background:var(--forest);color:var(--paper);font-size:13px;font-weight:500;padding:8px 12px;border-radius:999px;box-shadow:0 10px 24px -8px rgba(0,0,0,.4);white-space:nowrap}
+.pin::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sun)}
+.legend{list-style:none;padding:0;margin:24px 0 0}
+.legend li{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid rgba(38,50,31,.12)}
+.legend li b{color:var(--green-d);min-width:2.2em;font-size:22px;line-height:1.1}
+
+/* ---------------------------------------------------------------------------
+   CENA 6b — SIMULAÇÃO 4D DA OBRA (Three.js · build3d.js)
+--------------------------------------------------------------------------- */
+.build{height:100vh;min-height:620px;background:#DCE1D8;color:var(--paper)}
+.build .bg{position:absolute;inset:0;background:radial-gradient(120% 90% at 70% 40%,#E6EAE2 0%,#D3D9CF 60%,#C3CBC0 100%)}
+#viewport3d,#viewportUnit{position:absolute;inset:0;overflow:hidden;opacity:0;transition:opacity .8s ease}
+#viewport3d.ready,#viewportUnit.ready{opacity:1}
+#viewport3d canvas,#viewportUnit canvas{display:block;width:100%!important;height:100%!important}
+#viewportUnit.no-webgl{opacity:1;display:flex;align-items:center;justify-content:flex-end;padding-right:5vw}
+#viewportUnit.no-webgl img{max-width:55vw;border-radius:12px}
+.unit3d{height:100vh;min-height:620px;background:#CDD4CB;color:var(--paper)}
+.tag3d.room{transition:none;text-align:center;line-height:1.15;padding:6px 12px 7px}
+.tag3d.room small{display:block;font-size:10.5px;font-weight:500;color:var(--sun-l)}
+.rlist{list-style:none;margin:14px 0 0;padding:0}
+.ctl3d{position:absolute;z-index:6;right:var(--pad);bottom:28px;display:flex;align-items:center;gap:6px;padding:7px;border-radius:999px;
+  background:rgba(27,36,24,.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 14px 34px -14px rgba(0,0,0,.6);
+  opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .4s,transform .4s}
+.ctl3d.ready{opacity:1;transform:none;pointer-events:auto}
+.ctl3d button{all:unset;cursor:pointer;min-width:38px;height:38px;border-radius:999px;display:grid;place-items:center;color:var(--paper);font-size:18px;line-height:1;
+  background:rgba(244,244,241,.08);transition:background .2s}
+.ctl3d button:hover{background:rgba(244,244,241,.18)}
+.ctl3d button:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+.ctl3d button.wide{font-size:13px;font-weight:600;padding:0 14px;white-space:nowrap}
+.ctl3d .reset{display:none}
+.ctl3d.on .reset{display:grid}
+.ctl3d.on [data-a="free"]{background:var(--sun);color:var(--ink)}
+.ctl3d .sep{width:1px;height:22px;background:rgba(244,244,241,.15);margin:0 2px}
+.ctl3d .hint{display:none;font-size:12px;opacity:.75;padding:0 10px 0 4px;white-space:nowrap}
+.ctl3d.on .hint{display:block}
+#viewportUnit.exploring,#viewport3d.exploring{cursor:grab}
+#viewportUnit.exploring:active,#viewport3d.exploring:active{cursor:grabbing}
+@media (max-height:760px){
+  .hudcard{padding:18px 22px 14px}
+  .hudcard .lead,.hudcard .note,.hudcard .phases{display:none}
+  .rlist li{padding:4px 0}
+}
+.rlist li{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed rgba(244,244,241,.16);font-size:14px;opacity:.38;transition:opacity .3s,color .3s}
+.rlist li b{font-weight:600;font-variant-numeric:tabular-nums}
+.rlist li.on{opacity:1}
+.rlist li.now{opacity:1;color:var(--sun-l)}
+.rlist li.total{border-bottom:none;opacity:1;color:var(--sun-l);font-size:15px}
+#viewport3d .fallback{position:absolute;left:50%;top:12%;translate:-50% 0;color:var(--ink);font-size:14px}
+#viewport3d.no-webgl{opacity:1;display:flex;align-items:center;justify-content:flex-end;padding-right:6vw}
+#viewport3d.no-webgl img{max-width:52vw;border-radius:12px}
+.tag3d{position:absolute;left:0;top:0;padding:6px 12px;border-radius:999px;background:var(--forest);color:#fff;font-size:12px;font-weight:600;letter-spacing:.02em;
+  white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .45s;box-shadow:0 8px 20px -8px rgba(0,0,0,.5)}
+.tag3d::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:18px;background:var(--forest)}
+.tag3d.show{opacity:1}
+.hudcard{position:absolute;z-index:4;left:var(--pad);top:50%;translate:0 -50%;width:min(380px,86vw);padding:26px 26px 20px;border-radius:20px;
+  background:rgba(27,36,24,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 30px 70px -30px rgba(0,0,0,.6);border:1px solid rgba(244,244,241,.08)}
+.hudcard .h2{font-size:clamp(28px,2.8vw,42px);margin:.15em 0 .3em}
+.hudcard .lead{font-size:14px;max-width:none;opacity:.8}
+.hud{display:flex;gap:26px;margin:18px 0 14px}
+.hud b{display:block;font-size:clamp(40px,4vw,60px);font-weight:700;line-height:1;color:var(--sun-l);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.hud span{font-size:12px;opacity:.75}
+.phases{list-style:none;margin:0;padding:0}
+.phases li{display:flex;align-items:center;gap:11px;padding:6px 0;font-size:13.5px;opacity:.36;transition:opacity .3s,color .3s}
+.phases li::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid var(--green-l);flex:none;transition:background .3s}
+.phases li.on{opacity:.95}
+.phases li.on::before{background:var(--green-l)}
+.phases li.now{opacity:1;color:var(--sun-l)}
+.phases li.now::before{background:var(--sun);border-color:var(--sun);box-shadow:0 0 0 4px rgba(238,138,46,.25)}
+.bprog{height:4px;border-radius:4px;background:rgba(244,244,241,.12);margin-top:14px;overflow:hidden}
+.bprog i{display:block;height:100%;background:linear-gradient(90deg,var(--green-l),var(--sun));transform-origin:0 50%;transform:scaleX(0)}
+.bimkey{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:14px;font-size:11.5px;opacity:.8}
+.bimkey span{display:flex;align-items:center;gap:6px}
+.bimkey i{width:14px;height:3px;border-radius:2px}
+.note{font-size:11px;opacity:.5;margin:12px 0 0}
+
+/* ---------------------------------------------------------------------------
+   CENA 7 — PLANTA (clip-path wipe)
+--------------------------------------------------------------------------- */
+.unit{background:var(--ink);padding:16vh 0}
+.unit .inner{position:relative;z-index:4;padding:0 var(--pad);max-width:1320px;margin:0 auto;display:grid;grid-template-columns:1.25fr .75fr;gap:5vw;align-items:center}
+.floor{border-radius:16px;overflow:hidden;clip-path:inset(0 0 0 0);box-shadow:0 50px 100px -40px rgba(0,0,0,.8);border:1px solid rgba(244,244,241,.1)}
+.rooms{list-style:none;margin:20px 0 0;padding:0}
+.rooms li{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0;border-bottom:1px dashed rgba(244,244,241,.2);font-size:17px}
+.rooms li span:last-child{font-weight:600;font-variant-numeric:tabular-nums}
+.rooms li.total{border-bottom:none;font-size:20px;color:var(--sun-l)}
+.badge{display:inline-flex;align-items:center;gap:8px;margin-top:22px;padding:8px 14px;border-radius:10px;background:rgba(121,176,67,.15);color:var(--green-l);font-size:14px;font-weight:500}
+.unit .glow{width:40vw;height:40vw;right:-10vw;bottom:-10vw;background:rgba(238,138,46,.18)}
+
+/* ---------------------------------------------------------------------------
+   CENA 8 — EQUIPE (horizontal scroll)
+--------------------------------------------------------------------------- */
+.team{background:var(--paper);color:var(--ink);min-height:100vh}
+.team .head{position:relative;z-index:4;padding:9vh var(--pad) 3vh;max-width:1320px;margin:0 auto}
+.track{position:relative;z-index:4;display:flex;gap:22px;padding:0 var(--pad) 8vh;width:max-content}
+.card{width:min(78vw,330px);flex:none;background:#fff;border-radius:22px;padding:14px 14px 22px;box-shadow:0 30px 70px -36px rgba(38,50,31,.45);border:1px solid rgba(38,50,31,.06)}
+.card .ph{aspect-ratio:16/10;border-radius:14px;overflow:hidden;background:#F4F4F4}
+.card .ph img{width:100%;height:100%;object-fit:cover;object-position:50% 25%}
+.card h3{margin:16px 6px 0;font-size:21px;line-height:1.2}
+.card .role{margin:2px 6px 0;color:var(--green-d);font-weight:500;font-size:14px}
+.card .co{display:inline-block;margin:12px 6px 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:5px 10px;border-radius:999px;background:var(--paper-2);color:var(--mute)}
+.card p{margin:12px 6px 0;font-size:14px;color:#4B5547;line-height:1.55}
+.team .h2{font-size:clamp(30px,4vw,60px)}
+.card.co-sec .co{background:rgba(238,138,46,.14);color:#A4501C}
+
+/* ---------------------------------------------------------------------------
+   CENA 9 — STATUS / FECHO
+--------------------------------------------------------------------------- */
+.status{background:var(--forest);padding:16vh 0 0;content-visibility:auto;contain-intrinsic-size:auto 1200px}
+.status .inner{position:relative;z-index:4;padding:0 var(--pad);max-width:1180px;margin:0 auto}
+.steps{list-style:none;margin:6vh 0 0;padding:0;position:relative}
+.steps::before{content:"";position:absolute;left:15px;top:8px;bottom:8px;width:2px;background:rgba(244,244,241,.15)}
+.steps li{position:relative;padding:0 0 34px 54px}
+.steps li::before{content:"";position:absolute;left:6px;top:4px;width:20px;height:20px;border-radius:50%;border:2px solid rgba(244,244,241,.35);background:var(--forest)}
+.steps li.done::before{background:var(--green-l);border-color:var(--green-l)}
+.steps li.now::before{background:var(--sun);border-color:var(--sun);box-shadow:0 0 0 6px rgba(238,138,46,.25)}
+.steps b{display:block;font-size:20px;font-weight:600}
+.steps span{opacity:.75;font-size:15px}
+.steps .tag{display:inline-block;margin-left:8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--sun);color:var(--ink);vertical-align:middle}
+.outro{position:relative;z-index:4;text-align:center;padding:14vh var(--pad) 8vh}
+.outro svg{width:120px;height:120px;margin:0 auto 18px}
+.outro .name{font-size:clamp(34px,5vw,64px);font-weight:700;letter-spacing:-.03em;line-height:1}
+.outro .name span{display:block;font-weight:200;font-size:.5em;letter-spacing:.3em;text-transform:uppercase;margin-top:.4em}
+.footer{position:relative;z-index:4;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding:22px var(--pad);border-top:1px solid rgba(244,244,241,.12);font-size:13px;opacity:.75}
+.status .hill{opacity:.9}
+
+/* ---------------------------------------------------------------------------
+   RESPONSIVO
+--------------------------------------------------------------------------- */
+@media (max-width:900px){
+  .grid{grid-template-columns:1fr 1fr}
+  .place .inner,.plan .inner,.unit .inner{grid-template-columns:1fr}
+  .hudcard{top:64px;translate:0 0;left:12px;right:12px;width:auto;padding:16px 18px 14px}
+  .hudcard .lead,.hudcard .phases,.hudcard .note,.hudcard .bimkey,.hudcard .rlist,.hudcard .badge{display:none}
+  .hudcard .h2{font-size:24px}
+  .ctl3d{right:50%;translate:50% 0;bottom:18px}
+  .ctl3d .hint{display:none!important}
+  .hud{margin:8px 0 0;gap:22px} .hud b{font-size:34px}
+  .terrain .companion{width:46vw;bottom:6vh}
+  .pin{font-size:11px;padding:6px 10px}
+  .nav .tag{display:none}
+}
+@media (max-width:560px){
+  .grid{grid-template-columns:1fr}
+  .hero .meta .scroll-cue{display:none}
+  .terrain .companion{display:none}
+}
+/* Toque: sem scroll horizontal pinado — vira lista rolável nativa */
+.touch .track{width:auto;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.touch .card{scroll-snap-align:start}
+
+/* ---------------------------------------------------------------------------
+   OBRIGATÓRIO — prefers-reduced-motion
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:0.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:0.01ms !important;
+    scroll-behavior:auto !important;
+  }
+  .pollen{display:none}
+  .lit .word{color:var(--paper)}
+}
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Pular para o conteúdo</a>
+<div class="progress" aria-hidden="true"></div>
+
+<!-- Símbolo do logo redesenhado em SVG (vetor transparente, nítido em qualquer tamanho) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gSun" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F0943A"/><stop offset="1" stop-color="#E0632A"/></linearGradient>
+    <linearGradient id="gH1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7DB443"/><stop offset="1" stop-color="#5E9A3A"/></linearGradient>
+    <linearGradient id="gH2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3F7A3A"/><stop offset="1" stop-color="#244F35"/></linearGradient>
+    <clipPath id="cMark"><circle cx="50" cy="50" r="48"/></clipPath>
+    <symbol id="mark" viewBox="0 0 100 100">
+      <g clip-path="url(#cMark)">
+        <rect width="100" height="100" fill="url(#gSun)"/>
+        <circle cx="50" cy="46" r="15" fill="#fff"/>
+        <path d="M-2 42 C20 38 38 44 52 52 C66 60 82 48 102 46 L102 102 L-2 102Z" fill="url(#gH1)" stroke="#fff" stroke-width="3"/>
+        <path d="M-2 60 C24 70 52 58 102 60 L102 102 L-2 102Z" fill="#4E8A3A" stroke="#fff" stroke-width="3"/>
+        <path d="M-2 70 C28 88 62 84 102 72 L102 102 L-2 102Z" fill="url(#gH2)" stroke="#fff" stroke-width="3"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <a class="brand" href="#main-content" aria-label="Vale Verde Residencial — início">
+    <svg aria-hidden="true"><use href="#mark"/></svg>
+    <span>Vale Verde <span style="font-weight:300">Residencial</span></span>
+  </a>
+  <span class="tag">MCMV · Faixa 1 · Niterói</span>
+</header>
+
+<main id="main-content">
+
+<!-- =========================================================================
+     CENA 1 · HERO — o próprio logo vira paisagem: céu, sol nascendo, 3 colinas
+     Técnicas: 6-layer parallax + pinned scrub + split converge/diverge
+========================================================================== -->
+<section class="scene hero" data-scene="hero" style="--scene-height:200vh">
+  <!-- DEPTH 0: céu + foto real do terreno desfocada -->
+  <div class="layer depth-0" data-depth="0" aria-hidden="true">
+    <div class="sky"></div>
+    <div class="photo blur-bg"></div>
+  </div>
+  <!-- DEPTH 1: o sol (glow/atmosfera) — nasce conforme a rolagem -->
+  <div class="layer depth-1" data-depth="1" aria-hidden="true">
+    <div class="sun-wrap" id="heroSun"><div class="halo"></div><div class="sun float-slow"></div></div>
+  </div>
+  <!-- DEPTH 2: colina de trás (verde claro) -->
+  <div class="layer depth-2" data-depth="2" aria-hidden="true">
+    <div class="hill hill--back" id="hillBack"><svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 120 C240 60 420 120 620 170 C820 220 1040 110 1440 100 L1440 320 L0 320Z" fill="#79B043" stroke="#F4F4F1" stroke-width="6"/></svg></div>
+  </div>
+  <!-- DEPTH 3: colina do meio — o "vale" (objeto principal da cena) -->
+  <div class="layer depth-3" data-depth="3" aria-hidden="true">
+    <div class="hill hill--mid" id="hillMid"><svg viewBox="0 0 1440 300" preserveAspectRatio="none"><path d="M0 90 C300 170 640 50 1000 80 C1200 96 1320 120 1440 110 L1440 300 L0 300Z" fill="#4E8A3A" stroke="#F4F4F1" stroke-width="6"/></svg></div>
+  </div>
+  <!-- DEPTH 4: texto -->
+  <div class="content depth-4" data-depth="4">
+    <p class="eyebrow" data-animate="fade">Incorporação · Multifamiliar MCMV</p>
+    <h1 aria-label="Vale Verde Residencial">
+      <span class="w w-left" aria-hidden="true">Vale</span><span class="w w-right" aria-hidden="true">Verde</span>
+    </h1>
+    <span class="mask"><span class="sub" id="heroSub" aria-hidden="true">Residencial</span></span>
+  </div>
+  <!-- DEPTH 5: colina da frente + pólen flutuando -->
+  <div class="layer depth-5" data-depth="5" aria-hidden="true">
+    <div class="hill hill--front" id="hillFront"><svg viewBox="0 0 1440 240" preserveAspectRatio="none"><path d="M0 60 C360 200 860 170 1440 50 L1440 240 L0 240Z" fill="#2E5F3C" stroke="#F4F4F1" stroke-width="6"/></svg></div>
+    <div id="pollen"></div>
+  </div>
+  <div class="meta">
+    <div><strong>2026</strong><b>Faixa 1</b> · Niterói · Rio do Ouro</div>
+    <div class="scroll-cue" aria-hidden="true">Role<i></i></div>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 2 · MANIFESTO — Word-by-word scroll lighting (pinned)
+========================================================================== -->
+<section class="scene manifesto" data-scene="manifesto" id="manifesto">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><div class="ghost">RIO DO OURO</div></div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="glow"></div><div class="glow b"></div></div>
+  <div class="layer depth-2" data-depth="2" aria-hidden="true">
+    <svg class="leaf float-loop" style="right:9%;top:16%;width:80px" viewBox="0 0 100 100"><use href="#mark"/></svg>
+  </div>
+  <div class="inner depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--green-l)">O lugar</p>
+    <p class="lit" id="litText">Um terreno de <span class="hl">3.367 m²</span> em <span class="hl">Rio do Ouro, Niterói</span> — área em expansão urbana, ligada à Região Oceânica, perto de emprego, comércio e serviços, e com um ambiente residencial mais tranquilo. É aqui que nasce o Vale Verde: <span class="hl">75 novos lares</span> de interesse social.</p>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 3 · NÚMEROS — Multi-directional stagger grid + contadores
+========================================================================== -->
+<section class="scene numbers" data-scene="numbers">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><svg class="contours" data-contours="light" preserveAspectRatio="none"></svg></div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="glow"></div></div>
+  <div class="layer depth-2" data-depth="2" aria-hidden="true">
+    <svg class="leaf float-loop" style="left:4%;top:9%;width:54px;animation-duration:11s" viewBox="0 0 100 100"><use href="#mark"/></svg>
+  </div>
+  <div class="inner depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--green-d)">O projeto</p>
+    <h2 class="h2"><span class="mask"><span data-animate="line">Vale Verde</span></span><span class="mask"><span data-animate="line"><b>em números</b></span></span></h2>
+    <div class="grid" id="statGrid">
+      <article class="stat"><div class="big"><span data-count="75">75</span></div><div class="lbl">unidades habitacionais</div><div class="det">Multifamiliar MCMV Faixa 1 (FAR)</div></article>
+      <article class="stat accent"><div class="big">R$ <span data-count="13.4" data-dec="1">13,4</span><small>mi</small></div><div class="lbl">valor global da operação</div><div class="det">R$ 13.387.500 · financiamento à produção via Caixa</div></article>
+      <article class="stat"><div class="big"><span data-count="18">18</span><small>meses</small></div><div class="lbl">prazo de obra</div><div class="det">do início da execução à entrega</div></article>
+      <article class="stat"><div class="big"><span data-count="3367" data-sep="1">3.367</span><small>m²</small></div><div class="lbl">área do terreno</div><div class="det">lotes 264, 265 e 266 · Estrada Velha de Maricá</div></article>
+      <article class="stat"><div class="big"><span data-count="4">4</span><small>pav.</small></div><div class="lbl">pavimentos por bloco</div><div class="det">dentro do gabarito de 6 da zona ZUM+6</div></article>
+      <article class="stat accent"><div class="big"><span data-count="100">100</span><small>%</small></div><div class="lbl">demanda direcionada</div><div class="det">unidades destinadas via FAR, sem comercialização ativa</div></article>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 4 · TERRENO — Circle iris expand (pinned scrub) + companion card
+========================================================================== -->
+<section class="scene terrain" data-scene="terrain" id="terrain">
+  <div class="layer depth-0" data-depth="0">
+    <div class="iris" id="iris"><img src="assets/terreno-1.jpg" alt="Fotografia do terreno: área arborizada com gramado, árvores frutíferas e muro baixo de pedra"></div>
+  </div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="shade" id="terrainShade"></div></div>
+  <div class="inner depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--sun-l)">O terreno hoje</p>
+    <h2 class="h2"><span class="mask"><span data-animate="line">Verde que</span></span><span class="mask"><span data-animate="line"><b>dá nome ao projeto</b></span></span></h2>
+    <p class="lead" data-animate="fade">Terreno arborizado, com muros de pedra e topografia suave — um desnível de apenas 4 metros em toda a área, segundo o levantamento de curvas de nível.</p>
+    <div class="cota" data-animate="fade">
+      <div><b>72,5 m</b><span>cota mínima (frente)</span></div>
+      <div><b>76,5 m</b><span>cota máxima (fundos)</span></div>
+      <div><b>SIRGAS 2000</b><span>levantamento UTM</span></div>
+    </div>
+  </div>
+  <div class="layer depth-3" data-depth="3" style="pointer-events:none">
+    <figure class="companion" id="companion" style="margin:0"><img src="assets/terreno-2.jpg" alt="Segunda fotografia do terreno: vegetação densa, palmeiras e muro de contenção em pedra"><figcaption>Muros de pedra e vegetação existente</figcaption></figure>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 5 · LOCALIZAÇÃO + LEGISLAÇÃO — Scramble text nos dados
+========================================================================== -->
+<section class="scene place" data-scene="place">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><svg class="contours" data-contours="dark" preserveAspectRatio="none"></svg></div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="ghost">NITERÓI</div></div>
+  <div class="layer depth-2" data-depth="2" aria-hidden="true">
+    <svg class="leaf float-slow" style="right:6%;top:8%;width:46px" viewBox="0 0 100 100"><use href="#mark"/></svg>
+  </div>
+  <div class="inner depth-4" data-depth="4">
+    <div>
+      <p class="eyebrow" style="color:var(--green-l)">Localização</p>
+      <h2 class="h2"><span class="mask"><span data-animate="line">Onde a cidade</span></span><span class="mask"><span data-animate="line"><b>está crescendo</b></span></span></h2>
+      <p class="addr" data-animate="fade"><b>Estrada Velha de Maricá, 264/A</b><br>Rio do Ouro · Niterói · RJ</p>
+      <p class="eyebrow" style="opacity:.6">No entorno</p>
+      <ul class="chips" id="chips">
+        <li><i></i>CIEP 126 – Almedorina Azeredo</li>
+        <li><i></i>CIEP 307 – Djanira</li>
+        <li class="h"><i></i>UBS Várzea das Moças</li>
+        <li class="c"><i></i>Padaria Rebeque</li>
+        <li class="c"><i></i>Acesso à RJ-106 e Região Oceânica</li>
+        <li class="c"><i></i>Equipamentos em Itaipu e Engenho do Mato</li>
+      </ul>
+      <a class="btn" href="https://www.google.com/maps/search/?api=1&query=Estrada+Velha+de+Maric%C3%A1+264+Rio+do+Ouro+Niter%C3%B3i+RJ" target="_blank" rel="noopener">Abrir no Google Maps →</a>
+    </div>
+    <div>
+      <p class="eyebrow" style="color:var(--sun-l)">Enquadramento urbanístico</p>
+      <dl class="table">
+        <div class="row"><dt>Zoneamento</dt><dd><span data-scramble>ZUM+6</span><small>Zona de Uso Misto</small></dd></div>
+        <div class="row"><dt>Gabarito máximo</dt><dd><span data-scramble>6 pavimentos</span><small>projeto usa 4 · embasamento 2 · lâmina 6</small></dd></div>
+        <div class="row"><dt>Legislação</dt><dd><span data-scramble>Lei 3.905/2024</span><small>Lei Urbanística de Niterói</small></dd></div>
+        <div class="row"><dt>Uso do solo</dt><dd><span data-scramble>Residencial · RL02</span><small>Região Administrativa Leste</small></dd></div>
+        <div class="row"><dt>Inserção urbana</dt><dd><span data-scramble>Portaria MCID 725/2023</span><small>escolas, saúde e comércio no entorno</small></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 6 · IMPLANTAÇÃO — Perspective zoom: a prancha "deita" e se endireita
+========================================================================== -->
+<section class="scene plan" data-scene="plan" id="plan">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><svg class="contours" data-contours="light" preserveAspectRatio="none"></svg></div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="glow" style="width:40vw;height:40vw;left:-8vw;top:20%;background:rgba(238,138,46,.18)"></div></div>
+  <div class="inner depth-4" data-depth="4">
+    <div>
+      <p class="eyebrow" style="color:var(--green-d)">Pré-projeto</p>
+      <h2 class="h2"><span class="mask"><span data-animate="line">Implantação</span></span><span class="mask"><span data-animate="line"><b>no terreno</b></span></span></h2>
+      <ul class="legend" id="legend">
+        <li><b>3</b><span>blocos residenciais de 4 pavimentos, em faixas paralelas com galeria de circulação central</span></li>
+        <li><b>75</b><span>apartamentos de 2 quartos</span></li>
+        <li><b>↔</b><span>vagas e acesso ao longo da frente de 81,92 m para a Estrada Velha de Maricá</span></li>
+        <li><b>✿</b><span>áreas verdes contornando os blocos e preservando árvores de grande porte</span></li>
+      </ul>
+    </div>
+    <div class="stage depth-3" data-depth="3">
+      <div class="board" id="board">
+        <img src="assets/implantacao.jpg" alt="Planta de implantação do pré-projeto: três blocos residenciais em faixas, áreas verdes e estacionamento ao longo da Estrada Velha de Maricá">
+        <span class="pin" style="left:6%;top:14%" data-pin>Bloco A</span>
+        <span class="pin" style="left:12%;top:46%" data-pin>Bloco B</span>
+        <span class="pin" style="left:30%;top:72%" data-pin>Bloco C</span>
+        <span class="pin" style="right:4%;top:40%" data-pin>Estrada Velha de Maricá</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 6b · SIMULAÇÃO DA OBRA — a planta de implantação deita em perspectiva
+     e os 3 blocos sobem piso a piso (CSS 3D puro, sem WebGL), pinado + scrub
+========================================================================== -->
+<section class="scene build" data-scene="build" id="build">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><div class="bg"></div></div>
+  <!-- DEPTH 3: viewport WebGL (Three.js) — maquete 4D gerada a partir do pré-projeto -->
+  <div class="layer depth-3" data-depth="3" style="pointer-events:none">
+    <div id="viewport3d" role="img" aria-label="Simulação 3D da obra: três blocos residenciais de cinco pavimentos sendo erguidos, das fundações às fachadas e ao paisagismo"></div>
+  </div>
+  <!-- controles da maquete do conjunto: zoom, giro e modo livre -->
+  <div class="ctl3d" role="toolbar" aria-label="Controles da simulação 3D">
+    <button type="button" data-a="out" aria-label="Afastar">−</button>
+    <button type="button" data-a="in" aria-label="Aproximar">+</button>
+    <span class="sep"></span>
+    <button type="button" data-a="left" aria-label="Girar para a esquerda">⟲</button>
+    <button type="button" data-a="right" aria-label="Girar para a direita">⟳</button>
+    <span class="sep"></span>
+    <button type="button" data-a="free" class="wide">✋ Explorar</button>
+    <button type="button" data-a="reset" class="wide reset">Voltar</button>
+    <span class="hint">Arraste para girar · roda do mouse ou pinça para zoom</span>
+  </div>
+  <!-- DEPTH 4: painel de controle da obra -->
+  <div class="hudcard depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--sun-l)">Simulação 4D · BIM</p>
+    <h2 class="h2">A obra, <b>piso a piso</b></h2>
+    <p class="lead">Maquete gerada a partir do pré-projeto: unidade tipo, implantação e fachadas. Role para avançar 18 meses de obra.</p>
+    <div class="hud" aria-live="polite">
+      <div><b id="hudFloor">0</b><span>de 4 pavimentos</span></div>
+      <div><b id="hudMonth">0</b><span>de 18 meses</span></div>
+    </div>
+    <ol class="phases" id="phases">
+      <li>Terraplanagem e fundação</li>
+      <li>Estrutura · alvenaria estrutural e lajes</li>
+      <li>Cobertura, platibanda e caixas d'água</li>
+      <li>Fachadas, esquadrias e guarda-corpos</li>
+      <li>Paisagismo, pavimentação e entrega</li>
+    </ol>
+    <div class="bprog" aria-hidden="true"><i id="bprog"></i></div>
+    <div class="bimkey" aria-hidden="true">
+      <span><i style="background:#2F7BD8"></i>Modelo planejado</span>
+      <span><i style="background:#E8822F"></i>Em execução</span>
+      <span><i style="background:#B9B6AE"></i>Executado</span>
+    </div>
+    <p class="note">Volumetria a partir do pré-projeto; cronograma ilustrativo.</p>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 7 · UNIDADE — Clip-path wipe na planta + contadores de área
+========================================================================== -->
+<section class="scene unit3d" data-scene="unit3d" id="unit3d">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><div class="bg" style="position:absolute;inset:0;background:radial-gradient(110% 90% at 65% 45%,#E3E7DF 0%,#CDD4CB 65%,#BFC7BB 100%)"></div></div>
+  <!-- DEPTH 3: maquete 3D da unidade (Three.js · unit3d.js) -->
+  <div class="layer depth-3" data-depth="3" style="pointer-events:none">
+    <div id="viewportUnit" role="img" aria-label="Maquete 3D da unidade tipo de 2 quartos: paredes sobem, esquadrias e acabamentos são instalados e os ambientes são mobiliados"></div>
+  </div>
+  <!-- controles da maquete: zoom, giro e modo livre -->
+  <div class="ctl3d" role="toolbar" aria-label="Controles da maquete 3D">
+    <button type="button" data-a="out" aria-label="Afastar">−</button>
+    <button type="button" data-a="in" aria-label="Aproximar">+</button>
+    <span class="sep"></span>
+    <button type="button" data-a="left" aria-label="Girar para a esquerda">⟲</button>
+    <button type="button" data-a="right" aria-label="Girar para a direita">⟳</button>
+    <span class="sep"></span>
+    <button type="button" data-a="free" class="wide">✋ Explorar</button>
+    <button type="button" data-a="reset" class="wide reset">Voltar</button>
+    <span class="hint">Arraste para girar · roda do mouse ou pinça para zoom</span>
+  </div>
+  <div class="hudcard depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--sun-l)">A unidade · maquete 3D</p>
+    <h2 class="h2">Planta <b>tipo</b></h2>
+    <p class="lead">2 quartos, sala e cozinha integradas, banheiro acessível e varanda, modelados a partir da planta do pré-projeto.</p>
+    <ul class="rlist" id="unitRooms">
+      <li data-room="q1"><span>Quarto casal</span><b>8,92 m²</b></li>
+      <li data-room="q2"><span>Quarto 2</span><b>9,23 m²</b></li>
+      <li data-room="sala"><span>Sala / estar e jantar</span><b>18,38 m²</b></li>
+      <li data-room="coz"><span>Cozinha e serviço</span><b>incl.</b></li>
+      <li data-room="ban"><span>Banheiro acessível</span><b>3,36 m²</b></li>
+      <li data-room="var"><span>Varanda</span><b>1,75 m²</b></li>
+      <li class="total"><span>Soma dos ambientes</span><b>≈ 41,64 m²</b></li>
+    </ul>
+    <ol class="phases" id="unitPhases" style="margin-top:14px">
+      <li>Laje e marcação (modelo BIM)</li>
+      <li>Alvenaria estrutural</li>
+      <li>Esquadrias, portas e guarda-corpo</li>
+      <li>Pintura e porcelanato</li>
+      <li>Mobiliário e ambientação</li>
+    </ol>
+    <div class="bprog" aria-hidden="true"><i id="unitBar"></i></div>
+    <p class="note">Layout com áreas de giro para cadeira de rodas (NBR 9050); mobiliário ilustrativo.</p>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 8 · EQUIPE — Horizontal scroll conversion (pinned)
+========================================================================== -->
+<section class="scene team" data-scene="team" id="team">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><svg class="contours" data-contours="light" preserveAspectRatio="none"></svg></div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="glow" style="width:44vw;height:44vw;right:-10vw;top:-10vw;background:rgba(121,176,67,.22)"></div></div>
+  <div class="head depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--green-d)">Quem faz</p>
+    <h2 class="h2" style="margin-bottom:0"><span class="mask"><span data-animate="line">Equipe de</span></span><span class="mask"><span data-animate="line"><b>gestão</b></span></span></h2>
+  </div>
+  <div class="track" id="track">
+    <article class="card"><div class="ph"><img src="assets/pedro.jpg" alt="Retrato de Pedro Martins"></div><h3>Pedro Martins</h3><p class="role">Incorporador & Arquiteto</p><span class="co">Valor Desenvolvimento</span><p>Desenvolvimento de produtos imobiliários da concepção à gestão estratégica, com foco em parcerias, estruturação de SPEs e valorização de terrenos.</p></article>
+    <article class="card"><div class="ph"><img src="assets/eurico.jpg" alt="Retrato de Eurico Paes"></div><h3>Eurico Paes</h3><p class="role">Incorporador & Finanças</p><span class="co">Valor Desenvolvimento</span><p>Pós-graduado em Investimentos Imobiliários. Captação de recursos, planejamento estratégico e estruturação de projetos com ênfase em retorno e viabilidade.</p></article>
+    <article class="card"><div class="ph"><img src="assets/filipe.jpg" alt="Retrato de Filipe Ramos"></div><h3>Filipe Ramos</h3><p class="role">Arquiteto & Urbanista</p><span class="co">Valor Desenvolvimento</span><p>Mais de 15 anos em empreendimentos, com passagem pela Tenda e projetos MCMV e de alto padrão. Projetos, compatibilização e acompanhamento de obras.</p></article>
+    <article class="card"><div class="ph"><img src="assets/sergio.jpg" alt="Retrato de Sérgio Cavalheiro"></div><h3>Sérgio Cavalheiro</h3><p class="role">Advogado</p><span class="co">Valor Desenvolvimento</span><p>Direito empresarial, com escritórios em São Paulo e Nova York. Governança corporativa, contratos comerciais e planejamento patrimonial.</p></article>
+    <article class="card co-sec"><div class="ph"><img src="assets/deny.jpg" alt="Retrato de Deny Morreira"></div><h3>Deny Morreira</h3><p class="role">Administrador</p><span class="co">Século Construtora</span><p>Gestão e coordenação de empreendimentos, relacionamento com parceiros e articulação institucional, na interface entre desenvolvimento e execução.</p></article>
+    <article class="card co-sec"><div class="ph"><img src="assets/danilo.jpg" alt="Retrato de Danilo Morreira"></div><h3>Danilo Morreira</h3><p class="role">Engenheiro</p><span class="co">Século Construtora</span><p>Coordenação de obras e gestão operacional, com acompanhamento técnico de prazo, custo e qualidade na execução.</p></article>
+  </div>
+</section>
+
+<!-- =========================================================================
+     CENA 9 · STATUS + FECHO — Theatrical enter, colinas voltam no rodapé
+========================================================================== -->
+<section class="scene status" data-scene="status">
+  <div class="layer depth-0" data-depth="0" aria-hidden="true"><svg class="contours" data-contours="dark" preserveAspectRatio="none"></svg></div>
+  <div class="layer depth-1" data-depth="1" aria-hidden="true"><div class="glow" style="width:50vw;height:50vw;left:25vw;bottom:-25vw;background:rgba(238,138,46,.28)"></div></div>
+  <div class="inner depth-4" data-depth="4">
+    <p class="eyebrow" style="color:var(--sun-l)">Status</p>
+    <h2 class="h2"><span class="mask"><span data-animate="line">Próximos</span></span><span class="mask"><span data-animate="line"><b>passos</b></span></span></h2>
+    <ol class="steps" id="steps">
+      <li class="done"><b>Terreno, topografia e zoneamento</b><span>Perímetro de 3.367 m², curvas de nível e enquadramento ZUM+6</span></li>
+      <li class="done"><b>Pré-projeto</b><span>Implantação com 3 blocos de 4 pavimentos e planta tipo de 2 quartos</span></li>
+      <li class="now"><b>Validação na Secretaria de Habitação <span class="tag">em andamento</span></b><span>Enquadramento para contratação via Caixa (FAR / GERIC)</span></li>
+      <li><b>Contratação via Caixa</b><span>Financiamento à produção — MCMV Faixa 1</span></li>
+      <li><b>Obra · 18 meses</b><span>Execução pela Século Construtora</span></li>
+      <li><b>Entrega</b><span>75 famílias com demanda direcionada pelo FAR</span></li>
+    </ol>
+  </div>
+  <div class="outro depth-4" data-depth="4">
+    <svg class="float-loop" aria-hidden="true"><use href="#mark"/></svg>
+    <div class="name">Vale Verde<span>Residencial</span></div>
+  </div>
+  <div class="layer depth-5" data-depth="5" aria-hidden="true" style="top:auto;height:24vh">
+    <div class="hill" style="bottom:-2px"><svg viewBox="0 0 1440 160" preserveAspectRatio="none"><path d="M0 70 C360 150 860 130 1440 40 L1440 160 L0 160Z" fill="#2E5F3C" stroke="#F4F4F1" stroke-width="5"/></svg></div>
+  </div>
+  <footer class="footer"><span>Residencial Vale Verde SPE · Valor Desenvolvimento · Século Construtora</span><span>MCMV Faixa 1 · Niterói/RJ · 2026</span></footer>
+</section>
+
+</main>
+
+<!-- Three.js (simulação 4D) — import map + módulo próprio -->
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module" src="build3d.js"></script>
+<script type="module" src="unit3d.js"></script>
+<!-- GSAP via jsDelivr (exigência da skill) -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const touch   = window.matchMedia('(pointer: coarse)').matches;   // efeitos reduzidos em toque
+  if (touch) document.documentElement.classList.add('touch');
+
+  /* ---------- Curvas de nível decorativas (eco do levantamento topográfico) ---------- */
+  document.querySelectorAll('svg[data-contours]').forEach((svg, k) => {
+    const dark = svg.dataset.contours === 'dark';
+    svg.setAttribute('viewBox','0 0 1000 600');
+    let d = '';
+    for (let i = 0; i < 14; i++) {
+      const y0 = 30 + i * 42, a = 14 + (i % 4) * 6, ph = i * .7 + k;
+      d += `M -20 ${y0}`;
+      for (let x = 0; x <= 1040; x += 40) {
+        const y = y0 + Math.sin(x / 140 + ph) * a + Math.cos(x / 61 + ph * 1.7) * 6;
+        d += ` L ${x} ${y.toFixed(1)}`;
+      }
+    }
+    svg.innerHTML = `<path d="${d}" fill="none" stroke="${dark ? 'rgba(121,176,67,.16)' : 'rgba(46,95,60,.12)'}" stroke-width="1.2"/>`;
+  });
+
+  /* ---------- Pólen da depth-5 do hero ---------- */
+  const pollen = document.getElementById('pollen');
+  if (!reduced) for (let i = 0; i < 12; i++) {
+    const s = document.createElement('span');
+    s.className = 'pollen';
+    s.style.left = (8 + Math.random() * 84) + '%';
+    s.style.bottom = (10 + Math.random() * 40) + '%';
+    s.style.animationDelay = (-Math.random() * 10) + 's';
+    s.style.animationDuration = (8 + Math.random() * 6) + 's';
+    s.style.transform = `scale(${.5 + Math.random()})`;
+    pollen.appendChild(s);
+  }
+
+  /* ---------- Split em palavras (preserva leitura: aria no pai) ---------- */
+  function splitWords(el){
+    const label = el.textContent.replace(/\s+/g,' ').trim();
+    const walk = (node, hl) => {
+      const out = [];
+      node.childNodes.forEach(n => {
+        if (n.nodeType === 3) n.textContent.split(/(\s+)/).forEach(t => {
+          if (!t) return;
+          if (/^\s+$/.test(t)) out.push(document.createTextNode(' '));
+          else { const s = document.createElement('span'); s.className = 'word' + (hl ? ' hl' : ''); s.textContent = t; out.push(s); }
+        });
+        else out.push(...walk(n, n.classList && n.classList.contains('hl')));
+      });
+      return out;
+    };
+    const parts = walk(el, false);
+    el.textContent = '';
+    const wrap = document.createElement('span'); wrap.setAttribute('aria-hidden','true');
+    parts.forEach(p => wrap.appendChild(p));
+    el.appendChild(wrap);
+    el.setAttribute('aria-label', label);
+    return [...wrap.querySelectorAll('.word')];
+  }
+  const litWords = splitWords(document.getElementById('litText'));
+
+  /* ---------- Formatação pt-BR ---------- */
+  const fmt = (v, dec) => v.toLocaleString('pt-BR', {minimumFractionDigits:dec, maximumFractionDigits:dec});
+
+  /* ---------- Sem GSAP ou com reduced-motion: tudo visível e estático ---------- */
+  if (reduced || !window.gsap || !window.ScrollTrigger) {
+    litWords.forEach(w => w.classList.add('on'));
+    return;
+  }
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* will-change só enquanto anima (regra de performance da skill) */
+  const wc = (els, on) => gsap.utils.toArray(els).forEach(e => e.style.willChange = on ? 'transform, opacity' : 'auto');
+
+  /* ---------- Barra de progresso ---------- */
+  gsap.to('.progress', {scaleX:1, ease:'none', scrollTrigger:{trigger:document.body, start:'top top', end:'bottom bottom', scrub:.3}});
+
+  /* ---------- PARALLAX GENÉRICO por profundidade (0.10x → 1.20x) ---------- */
+  const SPEED = {0:.10, 1:.25, 2:.50, 3:.80, 5:1.20};
+  document.querySelectorAll('.scene').forEach(scene => {
+    if (['hero','build','unit3d'].includes(scene.dataset.scene)) return;    // timelines próprias
+    scene.querySelectorAll(':scope > .layer[data-depth]').forEach(layer => {
+      const s = SPEED[layer.dataset.depth]; if (s === undefined) return;
+      const dist = (1 - s) * (touch ? 60 : 160);
+      gsap.fromTo(layer, {y: -dist/2}, {y: dist/2, ease:'none',
+        scrollTrigger:{trigger:scene, start:'top bottom', end:'bottom top', scrub:true,
+          onToggle: self => wc(layer, self.isActive)}});
+    });
+  });
+
+  /* ---------- CENA 1 · HERO: entrada (split converge + masked line) ---------- */
+  const intro = gsap.timeline({defaults:{ease:'expo.out'}, onStart:()=>wc('.hero .w, #heroSub', true), onComplete:()=>wc('.hero .w, #heroSub', false)});
+  intro.from('#heroSun', {yPercent:40, scale:.85, opacity:0, duration:2})
+       .from('#hillBack', {yPercent:30, duration:1.6}, 0.1)
+       .from('#hillMid',  {yPercent:40, duration:1.6}, 0.2)
+       .from('#hillFront',{yPercent:50, duration:1.6}, 0.3)
+       .from('.hero .w-left',  {x:'-55vw', opacity:0, skewX:12, duration:1.6}, .45)
+       .from('.hero .w-right', {x:'55vw',  opacity:0, skewX:-12, duration:1.6}, .45)
+       .from('#heroSub', {yPercent:110, duration:1.2}, 1.1)
+       .from('.hero .eyebrow, .hero .meta', {opacity:0, y:16, duration:1, stagger:.1}, 1.2);
+
+  /* ---------- HERO: scroll pinado — o sol nasce, colinas se abrem, título diverge ---------- */
+  const heroTL = gsap.timeline({scrollTrigger:{trigger:'.hero', start:'top top', end:touch ? '+=60%' : '+=110%', pin:!touch, scrub:.6,
+    onToggle: s => wc('#heroSun, .hill, .hero .w', s.isActive)}});
+  heroTL.to('#heroSun',  {yPercent:-55, scale:1.12, ease:'none'}, 0)
+        .to('#hillBack', {yPercent:-8,  ease:'none'}, 0)
+        .to('#hillMid',  {yPercent:12,  ease:'none'}, 0)
+        .to('#hillFront',{yPercent:38,  ease:'none'}, 0)
+        .to('.hero .photo', {scale:1.18, ease:'none'}, 0)
+        .to('.hero .w-left',  {x:'-38vw', opacity:0, ease:'power2.in'}, .35)
+        .to('.hero .w-right', {x:'38vw',  opacity:0, ease:'power2.in'}, .35)
+        .to('#heroSub, .hero .eyebrow', {opacity:0, y:-30, ease:'power2.in'}, .35)
+        .to('.pollen', {y:-80, ease:'none'}, 0);
+
+  /* ---------- Masked line reveal em todos os títulos ---------- */
+  gsap.utils.toArray('[data-animate="line"]').forEach(el => {
+    gsap.from(el, {yPercent:105, duration:1.1, ease:'expo.out',
+      scrollTrigger:{trigger:el.closest('h2'), start:'top 85%'}});
+  });
+  gsap.utils.toArray('[data-animate="fade"]').forEach(el => {
+    if (el.closest('.hero')) return;
+    gsap.from(el, {opacity:0, y:24, duration:1, ease:'power3.out', scrollTrigger:{trigger:el, start:'top 88%'}});
+  });
+
+  /* ---------- CENA 2 · Word-by-word lighting (pinado) ---------- */
+  ScrollTrigger.create({
+    trigger:'#manifesto', start:'top top', end: touch ? 'bottom 40%' : `+=${litWords.length * 34}`,
+    pin:!touch, scrub:.5,
+    ...(touch ? {start:'top 70%'} : {}),
+    onUpdate: self => { const n = Math.round(self.progress * litWords.length); litWords.forEach((w,i)=>w.classList.toggle('on', i < n)); }
+  });
+
+  /* ---------- Contadores ---------- */
+  function counter(el){
+    const end = parseFloat(el.dataset.count), dec = +(el.dataset.dec || 0), o = {v:0};
+    gsap.to(o, {v:end, duration:1.8, ease:'power3.out', onUpdate:()=> el.textContent = fmt(o.v, dec),
+      scrollTrigger:{trigger:el, start:'top 90%'}});
+  }
+  document.querySelectorAll('[data-count]').forEach(counter);
+
+  /* ---------- CENA 3 · Stagger grid multidirecional ---------- */
+  const dirs = [{x:-80},{y:80},{x:80},{x:-80},{y:-60},{x:80}];
+  gsap.utils.toArray('#statGrid .stat').forEach((card,i) => {
+    gsap.from(card, {...dirs[i], opacity:0, rotate:(i%2?2:-2), duration:1.1, ease:'back.out(1.4)', delay:(i%3)*.08,
+      scrollTrigger:{trigger:'#statGrid', start:'top 82%'}});
+  });
+
+  /* ---------- CENA 4 · Circle iris expand + companion ---------- */
+  const tTL = gsap.timeline({scrollTrigger:{trigger:'#terrain', start:'top top', end: touch ? '+=40%' : '+=100%', pin:!touch, scrub:.6,
+    ...(touch ? {start:'top 80%'} : {})}});
+  tTL.fromTo('#iris', {clipPath:'circle(8% at 72% 55%)'}, {clipPath:'circle(150% at 72% 55%)', ease:'power2.inOut'}, 0)
+     .fromTo('#iris img', {scale:1.35}, {scale:1, ease:'none'}, 0)
+     .fromTo('#terrainShade', {opacity:0}, {opacity:1, ease:'none'}, .2)
+     .fromTo('#terrain .inner > *', {opacity:0, y:40}, {opacity:1, y:0, stagger:.08, ease:'power2.out'}, .35)
+     .fromTo('#companion', {xPercent:140, rotate:14}, {xPercent:0, rotate:3, ease:'back.out(1.2)'}, .55);
+
+  /* ---------- CENA 5 · Chips + scramble ---------- */
+  gsap.from('#chips li', {opacity:0, y:18, scale:.9, stagger:.07, duration:.7, ease:'back.out(2)', scrollTrigger:{trigger:'#chips', start:'top 88%'}});
+  const GLYPHS = 'ABCDEFGHJKLMNPRSTUVXZ0123456789+/·';
+  document.querySelectorAll('[data-scramble]').forEach((el, idx) => {
+    const final = el.textContent;
+    ScrollTrigger.create({trigger:el, start:'top 90%', once:true, onEnter:()=>{
+      let f = 0; const total = 26 + idx * 3;
+      const tick = () => {
+        f++;
+        el.textContent = final.split('').map((c,i)=> (c===' ' || i < (f/total)*final.length) ? c : GLYPHS[(Math.random()*GLYPHS.length)|0]).join('');
+        if (f < total) requestAnimationFrame(tick); else el.textContent = final;
+      };
+      tick();
+    }});
+  });
+
+  /* ---------- CENA 6 · Perspective flatten da implantação ---------- */
+  const pTL = gsap.timeline({scrollTrigger:{trigger:'#plan', start: touch ? 'top 75%' : 'top top', end: touch ? 'center center' : '+=90%', pin:!touch, scrub:.6,
+    onToggle: s => wc('#board', s.isActive)}});
+  pTL.fromTo('#board', {rotateX:58, rotateZ:-8, scale:.78, y:60}, {rotateX:0, rotateZ:0, scale:1, y:0, ease:'power2.out'}, 0)
+     .from('[data-pin]', {opacity:0, scale:.6, y:12, stagger:.08, ease:'back.out(2)'}, .55)
+     .from('#legend li', {opacity:0, x:-30, stagger:.08, ease:'power2.out'}, .25);
+
+  /* ---------- CENA 6b · Obra 4D: pin + progresso → build3d.js (Three.js) ---------- */
+  ScrollTrigger.create({trigger:'#build', start:'top top', end:'+=480%', pin:true, anticipatePin:1,
+    onUpdate: s => { const p = Math.min(1, s.progress / .85);          // respiro no final
+      window.__vvBuild = p; window.dispatchEvent(new CustomEvent('vv-build', {detail:p})); }});
+
+  /* ---------- CENA 7 · Planta 3D: pin + progresso → unit3d.js (Three.js) ---------- */
+  ScrollTrigger.create({trigger:'#unit3d', start:'top top', end:'+=460%', pin:true, anticipatePin:1,
+    onUpdate: s => { const p = Math.min(1, s.progress / .78);          // últimos 22%: maquete completa, parada
+      window.__vvUnit = p; window.dispatchEvent(new CustomEvent('vv-unit', {detail:p})); }});
+
+  /* ---------- CENA 8 · Scroll horizontal da equipe ---------- */
+  if (!touch) {
+    const track = document.getElementById('track');
+    const dist = () => Math.max(0, track.scrollWidth - window.innerWidth);
+    gsap.to(track, {x:() => -dist(), ease:'none',
+      scrollTrigger:{trigger:'#team', start:'top top', end:() => '+=' + dist(), pin:true, scrub:.6, invalidateOnRefresh:true,
+        onToggle: s => wc(track, s.isActive)}});
+  }
+  gsap.from('#track .card', {opacity:0, y:60, rotate:3, stagger:.08, duration:1, ease:'back.out(1.3)', scrollTrigger:{trigger:'#team', start:'top 70%'}});
+
+  /* ---------- CENA 9 · Passos (theatrical enter) ---------- */
+  gsap.from('#steps li', {opacity:0, x:-40, stagger:.12, duration:.9, ease:'power3.out', scrollTrigger:{trigger:'#steps', start:'top 80%'}});
+  gsap.from('.outro', {opacity:0, scale:.92, duration:1.2, ease:'expo.out', scrollTrigger:{trigger:'.outro', start:'top 85%'}});
+
+  window.addEventListener('load', () => ScrollTrigger.refresh());
+})();
+</script>
+</body>
+</html>
